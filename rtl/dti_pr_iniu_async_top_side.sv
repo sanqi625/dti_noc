@@ -1,4 +1,4 @@
-module dti_pr_async_top_side
+module dti_pr_iniu_async_top_side
     import dti_pack::*;
     #(
         parameter ASYNC_FIFO_DEPTH = 16

@@ -1,4 +1,4 @@
-module dti_pr_async_sys_side
+module dti_pr_iniu_async_sys_side
     import dti_pack::*;
     #(
         parameter ASYNC_FIFO_DEPTH = 16
@@ -153,7 +153,6 @@ module dti_pr_async_sys_side
     //===========================================================================
     // async fifo req slv
     //===========================================================================
-    
     assign req_pld_vector = {req_payload,req_srcid,req_tgtid,req_qos,req_last};
     afifo_slv #(
         .DATA_WIDTH         (90+6+6+1+1          ),

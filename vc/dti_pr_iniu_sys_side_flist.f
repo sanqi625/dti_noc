@@ -1,2 +1,2 @@
--f $DTI_PR/vc/dti_pr_flist.f 
+-f $DTI_PR/vc/dti_pr_iniu_flist.f 
 $DTI_PR/rtl/dti_pr_iniu_async_sys_side.sv

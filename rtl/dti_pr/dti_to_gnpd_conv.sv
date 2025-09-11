@@ -1,4 +1,4 @@
-module dti_gnpd_conv 
+module dti_to_gnpd_conv 
     import dti_pack::*;
     (
     // REQ_data channel

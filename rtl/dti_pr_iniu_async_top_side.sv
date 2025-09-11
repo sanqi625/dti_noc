@@ -2,8 +2,7 @@ module dti_pr_iniu_async_top_side
     import dti_pack::*;
     #(
         parameter ASYNC_FIFO_DEPTH = 16
-    )
-    (
+    )(
     input   logic                                              clk           ,
     input   logic                                              rst_n         ,
     // RSP_data channel

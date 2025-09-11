@@ -2,8 +2,7 @@ module dti_pr_iniu_async_sys_side
     import dti_pack::*;
     #(
         parameter ASYNC_FIFO_DEPTH = 16
-    )
-    (
+    )(
     input   logic                                       clk                                         ,
     input   logic                                       rst_n                                       ,
     // dti_adapter
@@ -120,7 +119,7 @@ module dti_pr_iniu_async_sys_side
     //=================================================
     // CONV
     //================================================= 
-    dti_gnpd_conv u_dti_gnpd_conv (
+    dti_to_gnpd_conv u_dti_to_gnpd_conv (
     .req_tvalid      (conv_req_valid  ),
     .req_tdata       (conv_req_data   ),
     .req_tkeep       (conv_req_keep   ),

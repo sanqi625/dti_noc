@@ -1,0 +1,3 @@
+[submodule "fcip"]
+	path = fcip
+	url = git@github.com:fliibs/fcip.git

@@ -82,7 +82,7 @@ module `_PREFIX_(dti_pr)
         for (genvar i=0; i<TBU_NUM; i++) begin: rob_update_gen
             assign entry_con_req[i]        = tbu_req_en && (m_msg_type==DTI_TBU_CONDIS_REQ) && m_state && allocate_oh[i];
             assign entry_ack_con[i]        = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && s_state && (entry_tid[i] == rsp_tid);
-            assign entry_disconnect_ack[i] = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && !s_state && (entry_tid[i] == rsp_tid);
+            assign entry_disconnect_acl[i] = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && !s_state && (entry_tid[i] == rsp_tid);
             assign entry_disconnect_req[i] = tbu_req_en && (m_msg_type==DTI_TBU_CONDIS_REQ) && !m_state && (entry_tid[i] == req_tid);
             assign entry_trans_req[i]      = tbu_req_en && (m_msg_type!==DTI_TBU_CONDIS_REQ) && (entry_tid[i] == req_tid);
             assign entry_trans_ack[i]      = tbu_rsp_en && (s_msg_type!==DTI_TBU_CONDIS_ACK) && (entry_tid[i] == rsp_tid);
@@ -112,6 +112,7 @@ module `_PREFIX_(dti_pr)
                 .entry_trans_req     (entry_trans_req[i]     ),
                 .entry_trans_ack     (entry_trans_ack[i]     ),
                 .entry_ack_con       (entry_ack_con[i]       ),
+                .entry_con_deny      (entry_con_deny[i]      ),
                 .entry_disconnect_req(entry_disconnect_req[i]),
                 .entry_disconnect_ack(entry_disconnect_ack[i]),
                 .req_last            (req_last               ),

@@ -9,7 +9,6 @@ module `_PREFIX_(dti_pr_rob_state_entry)
     input   logic                                       entry_trans_ack                             ,
     input   logic                                       entry_trans_req                             ,
     input   logic                                       entry_ack_con                               ,
-    input   logic                                       entry_con_deny                              ,
     input   logic                                       entry_disconnect_req                        ,
     input   logic                                       entry_disconnect_ack                        ,
     input   logic                                       req_last                                    ,
@@ -50,14 +49,14 @@ module `_PREFIX_(dti_pr_rob_state_entry)
     // TRAN FINISH FLAG
     //=================================================
     always_ff @(posedge clk or negedge rst_n) begin: trans_finish_flag
-        if(!rst_n)                                        trans_finish <= 1'd0;
+        if(!rst_n)                                        trans_finish <= 1'd1;
         else if(entry_trans_req && !req_last)             trans_finish <= 1'd0;
         else if(entry_trans_req && req_last)              trans_finish <= 1'd1;
     end
     //=================================================
     // ENTRY STATE FSM
     //=================================================
-    assign entry_release      = (req_con&&entry_con_deny) || (req_dis&&entry_disconnect_ack);
+    assign entry_release      = (req_con || req_dis) && entry_disconnect_ack;
     assign partial_reset_done = disconnect_req && req_ready;
 
     always_ff @(posedge clk or negedge rst_n) begin: state_idle_update
@@ -70,7 +69,7 @@ module `_PREFIX_(dti_pr_rob_state_entry)
         if(!rst_n)                                         req_con <= 1'b0;
         else if(idle && entry_con_req)                     req_con <= 1'b1;
         else if(entry_ack_con)                             req_con <= 1'b0;
-        else if(entry_con_deny)                            req_con <= 1'b0; 
+        else if(entry_disconnect_ack)                      req_con <= 1'b0; 
     end
 
     always_ff @(posedge clk or negedge rst_n) begin: state_bypass_update
@@ -95,6 +94,7 @@ module `_PREFIX_(dti_pr_rob_state_entry)
     always_ff @(posedge clk or negedge rst_n) begin: state_req_dis_update
         if(!rst_n)                                         req_dis <= 1'b0;
         else if(partial_reset_done)                        req_dis <= 1'b1;
+        else if(normal_dis)                                req_dis <= 1'b1;
         else if(req_dis&&entry_disconnect_ack)             req_dis <= 1'b0; 
     end
     //=================================================

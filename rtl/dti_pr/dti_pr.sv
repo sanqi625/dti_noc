@@ -2,10 +2,7 @@ module dti_pr
     import dti_pack::*;
     (
     input   logic                                       clk                                         ,
-    input   logic                                       rst_n                                       ,
-    // DTI_PR_adapter
-    input   logic                                       partial_reset                               ,
-    output  logic                                       idle                                        ,
+    input   logic                                       rst_n                                       , 
     // REQ_data channel
     input   logic                                       req_tvalid                                  ,
     input   logic   [AXIS_DATA_WIDTH-1:0]               req_tdata                                   ,
@@ -33,36 +30,43 @@ module dti_pr
     input  logic    [CUSTOM_DATA_WIDTH-1:0]             rsp_data                                    ,
     input  logic    [CUSTOM_KEEP_WIDTH-1:0]             rsp_keep                                    ,
     input  logic    [TBU_NUM_WIDTH-1    :0]             rsp_tid                                     ,
-    input  logic                                        rsp_last                                    
+    input  logic                                        rsp_last                                    ,
+    // lp interface
+    input   logic                                       stall                                       ,
+    input   logic                                       partial_reset                               ,
+    output  logic                                       idle                                        
     );
 
-    logic [TBU_NUM-1:0]                  entry_alloc        ;
-    logic [TBU_NUM-1:0]                  entry_update       ;
-    logic [TBU_NUM-1:0]                  entry_release      ;
-    logic [TBU_NUM-1:0]                  entry_ack_connected;
-    logic [TBU_NUM-1:0]                  entry_idle         ;
-    logic                                tbu_req_en         ;
-    logic                                tbu_rsp_en         ;
-    logic [3:0]                          m_msg_type         ;
-    logic [3:0]                          s_msg_type         ;  
-    logic                                s_state            ;
-    logic [TBU_NUM_WIDTH-1    :0]        entry_tid          [TBU_NUM-1:0];
-    logic [TBU_NUM-1          :0]        entry_req_valid    ;
-    logic [CUSTOM_DATA_WIDTH-1:0]        entry_req_data     [TBU_NUM-1:0]; 
-    logic [CUSTOM_KEEP_WIDTH-1:0]        entry_req_keep     [TBU_NUM-1:0];
-    logic [TBU_NUM-1          :0]        entry_reset        ;
-    logic [$clog2(TBU_NUM)-1  :0]        entry_reset_id     ;
-    logic                                entry_reset_vld    ;
-    logic [TBU_NUM-1          :0]        entry_reset_arbiter;
-    logic [CUSTOM_DATA_WIDTH-1:0]        reset_data         ;
-    logic                                reset_valid        ;
-    logic [TBU_NUM-1          :0]        reset_id           ;
-    logic [$clog2(TBU_NUM)-1:0]          allocate_id        ;
-    logic                                allocate_vld       ;
-    logic [TBU_NUM-1:0]                  allocate_oh        ;
-    logic [CUSTOM_KEEP_WIDTH-1:0]        reset_keep         ;   
-    logic                                reset_last         ;
-    logic [TBU_NUM-1          :0]        entry_req_last     ;
+    logic [TBU_NUM-1:0]                  entry_con_req       ;
+    logic [TBU_NUM-1:0]                  entry_trans_req     ;
+    logic [TBU_NUM-1:0]                  entry_trans_ack     ;
+    logic [TBU_NUM-1:0]                  entry_ack_con ;
+    logic [TBU_NUM-1:0]                  entry_con_deny      ;
+    logic [TBU_NUM-1:0]                  entry_disconnect_req;
+    logic [TBU_NUM-1:0]                  entry_disconnect_ack;
+    logic [TBU_NUM-1:0]                  entry_idle          ;
+    logic                                tbu_req_en          ;
+    logic                                tbu_rsp_en          ;
+    logic [3:0]                          m_msg_type          ;
+    logic [3:0]                          s_msg_type          ;  
+    logic                                s_state             ;
+    logic [TBU_NUM_WIDTH-1    :0]        entry_tid           [TBU_NUM-1:0];
+    logic [TBU_NUM-1          :0]        entry_req_valid     ;
+    logic [CUSTOM_DATA_WIDTH-1:0]        entry_req_data      [TBU_NUM-1:0]; 
+    logic [CUSTOM_KEEP_WIDTH-1:0]        entry_req_keep      [TBU_NUM-1:0];
+    logic [TBU_NUM-1          :0]        entry_reset         ;
+    logic [$clog2(TBU_NUM)-1  :0]        entry_reset_id      ;
+    logic                                entry_reset_vld     ;
+    logic [TBU_NUM-1          :0]        entry_reset_arbiter ;
+    logic [CUSTOM_DATA_WIDTH-1:0]        reset_data          ;
+    logic                                reset_valid         ;
+    logic [TBU_NUM-1          :0]        reset_id            ;
+    logic [$clog2(TBU_NUM)-1:0]          allocate_id         ;
+    logic                                allocate_vld        ;
+    logic [TBU_NUM-1:0]                  allocate_oh         ;
+    logic [CUSTOM_KEEP_WIDTH-1:0]        reset_keep          ;   
+    logic                                reset_last          ;
+    logic [TBU_NUM-1          :0]        entry_req_last      ;
     
     //=================================================
     // ROB update logic
@@ -76,10 +80,13 @@ module dti_pr
 
     generate 
         for (genvar i=0; i<TBU_NUM; i++) begin: rob_update_gen
-            assign entry_alloc[i]         = tbu_req_en && (m_msg_type==DTI_TBU_CONDIS_REQ) && m_state && allocate_oh[i];
-            assign entry_ack_connected[i] = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && s_state && (entry_tid[i] == rsp_tid);
-            assign entry_update[i]        = tbu_req_en && (m_msg_type!==DTI_TBU_CONDIS_REQ) && (entry_tid[i] == req_tid);
-            assign entry_release[i]       = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && !s_state && (entry_tid[i] == rsp_tid);
+            assign entry_con_req[i]        = tbu_req_en && (m_msg_type==DTI_TBU_CONDIS_REQ) && m_state && allocate_oh[i];
+            assign entry_ack_con[i]        = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && s_state && (entry_tid[i] == rsp_tid);
+            assign entry_con_deny[i]       = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && !s_state && (entry_tid[i] == rsp_tid);
+            assign entry_disconnect_req[i] = tbu_req_en && (m_msg_type==DTI_TBU_CONDIS_REQ) && !m_state && (entry_tid[i] == req_ttid);
+            assign entry_disconnect_ack[i] = tbu_rsp_en && (s_msg_type==DTI_TBU_CONDIS_ACK) && s_state && (entry_tid[i] == rsp_tid);
+            assign entry_trans_req[i]      = tbu_req_en && (m_msg_type!==DTI_TBU_CONDIS_REQ) && (entry_tid[i] == req_ttid);
+            assign entry_trans_ack[i]      = tbu_rsp_en && (s_msg_type!==DTI_TBU_CONDIS_ACK) && (entry_tid[i] == rsp_tid);
         end
     endgenerate
     //=================================================
@@ -99,22 +106,25 @@ module dti_pr
     generate 
         for (genvar i=0; i<TBU_NUM; i++) begin: rob_entry
             dti_pr_rob_state_entry u_dti_pr_rob_state_entry (   
-                .clk                (clk                ),
-                .rst_n              (rst_n              ),
-                .entry_alloc        (entry_alloc[i]     ),
-                .entry_reset        (entry_reset[i]     ),
-                .entry_release      (entry_release[i]   ),
-                .entry_update       (entry_update[i]    ),
-                .entry_ack_connected(entry_ack_connected[i]),
-                .req_last           (req_last           ),
-                .entry_tid_in       (req_tid            ),
-                .req_ready          (req_ready          ),
-                .idle               (entry_idle[i]      ),
-                .entry_tid_out      (entry_tid[i]       ),
-                .entry_req_valid    (entry_req_valid[i] ),
-                .entry_req_data     (entry_req_data[i]  ),
-                .entry_req_keep     (entry_req_keep[i]  ),
-                .entry_req_last     (entry_req_last[i]  )
+                .clk                 (clk                    ),
+                .rst_n               (rst_n                  ),
+                .entry_reset         (entry_reset[i]         ),
+                .entry_con_req       (entry_con_req[i]       ),
+                .entry_trans_req     (entry_trans_req[i]     ),
+                .entry_trans_ack     (entry_trans_ack[i]     ),
+                .entry_ack_con       (entry_ack_con[i]       ),
+                .entry_con_deny      (entry_con_deny[i]      ),
+                .entry_disconnect_req(entry_disconnect_req[i]),
+                .entry_disconnect_ack(entry_disconnect_ack[i]),
+                .req_last            (req_last               ),
+                .entry_tid_in        (req_tid                ),
+                .req_ready           (req_ready              ),
+                .idle                (entry_idle[i]          ),
+                .entry_tid_out       (entry_tid[i]           ),
+                .entry_req_valid     (entry_req_valid[i]     ),
+                .entry_req_data      (entry_req_data[i]      ),
+                .entry_req_keep      (entry_req_keep[i]      ),
+                .entry_req_last      (entry_req_last[i]      )
             );
         end
     endgenerate 
@@ -152,12 +162,12 @@ module dti_pr
         end
     end
     // dti to conv 
-    assign req_valid   = partial_reset ? reset_valid : req_tvalid;
+    assign req_valid   = partial_reset ? reset_valid : (req_tvalid && ~stall);
     assign req_data    = partial_reset ? reset_data : req_tdata;
     assign req_keep    = partial_reset ? reset_keep : req_tkeep;  
     assign req_tid     = partial_reset ? reset_id : req_ttid;
     assign req_last    = partial_reset ? reset_last : req_tlast;
-    assign req_tready  = partial_reset ? 1'd0 : req_ready;
+    assign req_tready  = partial_reset ? 1'd0 : (req_ready && ~stall);
     //=================================================
     // CUSTOM to DTI
     //=================================================  

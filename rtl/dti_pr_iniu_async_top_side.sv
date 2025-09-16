@@ -1,4 +1,6 @@
 module dti_pr_iniu_async_top_side
+    import lwnoc_lp_define_package::*;
+    import lwnoc_lp_struct_package::*;
     import dti_pack::*;
     #(
         parameter ASYNC_FIFO_DEPTH = 16
@@ -32,7 +34,10 @@ module dti_pr_iniu_async_top_side
     output logic    [ASYNC_FIFO_DEPTH-1                   :0]  rsp_wptr_async,
     input  logic    [ASYNC_FIFO_DEPTH-1                   :0]  rsp_rptr_async,
     input  logic    [ASYNC_FIFO_DEPTH-1                   :0]  rsp_rptr_sync ,
-    output logic    [90+6+6+1+1                           :0]  rsp_pld_sync
+    output logic    [90+6+6+1+1                           :0]  rsp_pld_sync  ,
+    // LP 
+    input  lwnoc_lp_req_signal_t                               lp_hub_rx_req ,
+    output lwnoc_lp_req_signal_t                               lp_hub_tx_req 
     );
 
     logic [90+6+6+1+1-1:0]  req_pld_vector     ;
@@ -44,6 +49,51 @@ module dti_pr_iniu_async_top_side
     logic                   async_rsp_stall    ;
     logic                   async_rsp_clear    ;
     logic                   async_rsp_full_zero;
+    lwnoc_lp_req_signal_t   async_slave_hub_rx_req; 
+    lwnoc_lp_req_signal_t   async_slave_hub_tx_req;
+    lwnoc_lp_req_signal_t   async_master_hub_rx_req;
+    lwnoc_lp_req_signal_t   async_master_hub_tx_req;
+    lwnoc_lp_req_signal_t   v_stage_1_hub_rx_req[2:0];
+    lwnoc_lp_req_signal_t   v_stage_1_hub_tx_req[2:0];
+
+    //=================================================
+    // LP
+    //=================================================
+    assign v_stage_1_hub_rx_req[0] = lp_hub_rx_req;
+    assign v_stage_1_hub_rx_req[1] = async_slave_hub_rx_req;
+    assign v_stage_1_hub_rx_req[2] = async_master_hub_rx_req;
+    assign lp_hub_tx_req           = v_stage_1_hub_tx_req[0];
+    assign async_slave_hub_tx_req  = v_stage_1_hub_tx_req[1];
+    assign async_master_hub_tx_req = v_stage_1_hub_tx_req[2];
+
+    lwnoc_lp_tniu_async_bridge u_slv_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_slave_hub_tx_req     ),
+        .tx_req             (async_slave_hub_rx_req     ),
+        .stall_ptr          (async_rsp_stall            ),
+        .clear_ptr          (async_rsp_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (async_rsp_full_zero        )
+    );
+
+    lwnoc_lp_tniu_async_bridge u_mst_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_master_hub_tx_req    ),
+        .tx_req             (async_master_hub_rx_req    ),
+        .stall_ptr          (req_async_stall            ),
+        .clear_ptr          (req_async_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (req_async_full_zero        )
+    );
+
+    lwnoc_lp_hub_wrapper #(
+        .NUM_TERMINAL       (3                          )
+    ) u_stage_1_hub (
+        .v_rx_req           (v_stage_1_hub_rx_req       ),
+        .v_tx_req           (v_stage_1_hub_tx_req       )
+    );
     //===========================================================================
     // async fifo req mst
     //===========================================================================

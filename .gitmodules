@@ -1,3 +1,6 @@
 [submodule "fcip"]
 	path = fcip
 	url = git@github.com:fliibs/fcip.git
+[submodule "lwnoc_lowpower_component"]
+	path = lwnoc_lowpower_component
+	url = git@github.com:fliibs/lwnoc_lowpower_component.git

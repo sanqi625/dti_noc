@@ -1,80 +1,201 @@
 module dti_pr_iniu_async_sys_side
+    import lwnoc_lp_define_package::*;
+    import lwnoc_lp_struct_package::*;
     import dti_pack::*;
     #(
-        parameter ASYNC_FIFO_DEPTH = 16
+        parameter integer unsigned  ASYNC_FIFO_DEPTH    = 16,
+        parameter integer unsigned  TIME_OUT_WIDTH      = 10
     )(
-    input   logic                                       clk                                         ,
-    input   logic                                       rst_n                                       ,
-    // dti_adapter
-    input   logic                                       partial_reset                               ,
-    output  logic                                       idle                                        ,
+    input   logic                                       clk                          ,
+    input   logic                                       rst_n                        ,
     // REQ_data channel
-    input   logic                                       req_tvalid                                  ,
-    input   logic   [AXIS_DATA_WIDTH-1:0]               req_tdata                                   ,
-    input   logic   [AXIS_KEEP_WIDTH-1:0]               req_tkeep                                   ,
-    input   logic                                       req_tlast                                   ,
-    input   logic   [TBU_NUM_WIDTH-1  :0]               req_ttid                                    ,
-    output  logic                                       req_tready                                  , //custom rdy
+    input   logic                                       req_tvalid                   ,
+    input   logic   [AXIS_DATA_WIDTH-1:0]               req_tdata                    ,
+    input   logic   [AXIS_KEEP_WIDTH-1:0]               req_tkeep                    ,
+    input   logic                                       req_tlast                    ,
+    input   logic   [TBU_NUM_WIDTH-1  :0]               req_ttid                     ,
+    output  logic                                       req_tready                   , //custom rdy
     // RSP_data channel
-    output  logic                                       rsp_tvalid                                  ,
-    output  logic   [CUSTOM_DATA_WIDTH-1:0]             rsp_tdata                                   ,
-    output  logic   [CUSTOM_KEEP_WIDTH-1:0]             rsp_tkeep                                   ,
-    output  logic                                       rsp_tlast                                   ,
-    output  logic   [TBU_NUM_WIDTH-1    :0]             rsp_ttid                                     ,
-    input   logic                                       rsp_tready                                  , //dti rdy
+    output  logic                                       rsp_tvalid                   ,
+    output  logic   [CUSTOM_DATA_WIDTH-1:0]             rsp_tdata                    ,
+    output  logic   [CUSTOM_KEEP_WIDTH-1:0]             rsp_tkeep                    ,
+    output  logic                                       rsp_tlast                    ,
+    output  logic   [TBU_NUM_WIDTH-1    :0]             rsp_ttid                     ,
+    input   logic                                       rsp_tready                   , //dti rdy
     // async fifo req
-    output logic    [ASYNC_FIFO_DEPTH-1 :0]             req_wptr_async                              ,
-    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             req_rptr_async                              ,
-    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             req_rptr_sync                               ,
-    output logic    [90+6+6+1+1         :0]             req_pld_sync                                ,
+    output logic    [ASYNC_FIFO_DEPTH-1 :0]             req_wptr_async               ,
+    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             req_rptr_async               ,
+    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             req_rptr_sync                ,
+    output logic    [90+6+6+1+1         :0]             req_pld_sync                 ,
     // async fifo rsp
-    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_wptr_async                              ,
-    output logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_async                              ,
-    output logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_sync                               ,
-    input  logic    [90+6+6+1+1         :0]             rsp_pld_sync
+    input  logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_wptr_async               ,
+    output logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_async               ,
+    output logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_sync                ,
+    input  logic    [90+6+6+1+1         :0]             rsp_pld_sync                 ,
+    // LP
+    input  logic    [TIME_OUT_WIDTH-1   :0]             timeout_val                  ,
+    input  logic                                        preq                         ,
+    input  lwnoc_pchannel_state_t                       pstate                       ,
+    output lwnoc_pchannel_active_t                      pactive                      ,
+    output logic                                        paccept                      ,
+    output logic                                        pdeny                        ,
+    input  lwnoc_lp_req_signal_t                        lp_hub_rx_req                ,
+    output lwnoc_lp_req_signal_t                        lp_hub_tx_req 
+    );    
+    // conv
+    logic                                               conv_req_valid               ;
+    logic                                               conv_req_ready               ;
+    logic    [AXIS_DATA_WIDTH-1:0]                      conv_req_data                ;
+    logic    [AXIS_KEEP_WIDTH-1:0]                      conv_req_keep                ;
+    logic    [TBU_NUM_WIDTH-1  :0]                      conv_req_tid                 ;
+    logic                                               conv_req_last                ;                                                     
+    logic                                               conv_rsp_valid               ;
+    logic                                               conv_rsp_ready               ;
+    logic    [CUSTOM_DATA_WIDTH-1:0]                    conv_rsp_data                ;
+    logic    [CUSTOM_KEEP_WIDTH-1:0]                    conv_rsp_keep                ;
+    logic    [TBU_NUM_WIDTH-1    :0]                    conv_rsp_tid                 ;
+    logic                                               conv_rsp_last                ;
+    // DTI_to_async             
+    logic                                               req_valid                    ;
+    logic                                               req_ready                    ;
+    logic    [CUSTOM_DATA_WIDTH+CUSTOM_KEEP_WIDTH-1:0]  req_payload                  ;
+    logic    [TBU_NUM_WIDTH-1  :0]                      req_srcid                    ;
+    logic    [TBU_NUM_WIDTH-1  :0]                      req_tgtid                    ;
+    logic                                               req_qos                      ; //tie1
+    logic                                               req_threshold                ;
+    logic                                               req_last                     ;
+    // async_to_DTI                                                                     
+    logic                                               rsp_valid                    ;
+    logic                                               rsp_ready                    ;
+    logic    [CUSTOM_DATA_WIDTH+CUSTOM_KEEP_WIDTH-1:0]  rsp_payload                  ;
+    logic    [TBU_NUM_WIDTH-1    :0]                    rsp_srcid                    ;
+    logic    [TBU_NUM_WIDTH-1    :0]                    rsp_tgtid                    ;
+    logic                                               rsp_qos                      ; //tie 1
+    logic                                               rsp_threshold                ;
+    logic                                               rsp_last                     ;
+    // async fifo req          
+    logic                                               async_req_stall              ;
+    logic                                               async_req_clear              ;
+    logic                                               async_req_full_zero          ;
+    logic   [90+6+6+1+1-1:0]                            req_pld_vector               ;
+    // async fifo rsp             
+    logic                                               rsp_async_stall              ;
+    logic                                               rsp_async_clear              ;
+    logic                                               rsp_async_full_zero          ;
+    logic                                               rsp_async_idle               ;
+    logic   [90+6+6+1+1-1:0]                            rsp_pld_vector               ;
+    // lp   
+    logic                                               niu_stall                    ;
+    logic                                               niu_partical_rst             ;
+    logic                                               niu_idle                     ;  
+    lwnoc_lp_req_signal_t                               v_stage_1_hub_rx_req    [2:0];
+    lwnoc_lp_req_signal_t                               v_stage_1_hub_tx_req    [2:0];
+    lwnoc_lp_req_signal_t                               v_stage_2_hub_rx_req    [3:0];
+    lwnoc_lp_req_signal_t                               v_stage_2_hub_tx_req    [3:0];
+    lwnoc_lp_req_signal_t                               lp_iniu_rx_req               ;
+    lwnoc_lp_req_signal_t                               lp_iniu_tx_req               ;
+    lwnoc_lp_req_signal_t                               niu_lp_hub_rx_req            ;
+    lwnoc_lp_req_signal_t                               niu_lp_hub_tx_req            ;
+    lwnoc_lp_req_signal_t                               barrier_lp_hub_tx_req        ;
+    lwnoc_lp_req_signal_t                               barrier_lp_hub_rx_req        ;
+    lwnoc_lp_req_signal_t                               barrier_lp_sub_hub_tx_req    ;
+    lwnoc_lp_req_signal_t                               barrier_lp_sub_hub_rx_req    ;
+    lwnoc_lp_req_signal_t                               async_master_hub_tx_req      ;
+    lwnoc_lp_req_signal_t                               async_master_hub_rx_req      ;
+    lwnoc_lp_req_signal_t                               async_slave_hub_tx_req       ;
+    lwnoc_lp_req_signal_t                               async_slave_hub_rx_req       ;
+
+    //=================================================
+    // LP
+    //=================================================
+
+    assign v_stage_1_hub_rx_req[0]   = lp_iniu_rx_req;
+    assign v_stage_1_hub_rx_req[1]   = niu_lp_hub_rx_req;
+    assign v_stage_1_hub_rx_req[2]   = barrier_lp_hub_rx_req;
+  
+    assign lp_iniu_tx_req            = v_stage_1_hub_tx_req[0];
+    assign niu_lp_hub_tx_req         = v_stage_1_hub_tx_req[1];
+    assign barrier_lp_hub_tx_req     = v_stage_1_hub_tx_req[2];
+
+    assign v_stage_2_hub_rx_req[0]   = barrier_lp_sub_hub_rx_req;
+    assign v_stage_2_hub_rx_req[1]   = async_slave_hub_rx_req;
+    assign v_stage_2_hub_rx_req[2]   = async_master_hub_rx_req;
+    assign v_stage_2_hub_rx_req[3]   = lp_hub_rx_req;
+
+    assign barrier_lp_sub_hub_tx_req = v_stage_2_hub_tx_req[0];
+    assign async_slave_hub_tx_req    = v_stage_2_hub_tx_req[1];
+    assign async_master_hub_tx_req   = v_stage_2_hub_tx_req[2];
+    assign lp_hub_tx_req             = v_stage_2_hub_tx_req[3];
+
+    lwnoc_lp_iniu u_lwnoc_lp_iniu(
+        .clk          (clk                ),
+        .rst_n        (rst_n              ),
+        .rx_req       (lp_iniu_tx_req     ),
+        .tx_req       (lp_iniu_rx_req     ),
+        .preq         (preq               ),
+        .pstate       (pstate             ),
+        .pactive      (pactive            ),
+        .paccept      (paccept            ),
+        .pdeny        (pdeny              )
+    ); 
+
+    lwnoc_lp_hub_wrapper #(
+        .NUM_TERMINAL       (3                          )
+    ) u_stage_1_hub (
+        .v_rx_req           (v_stage_1_hub_rx_req       ),
+        .v_tx_req           (v_stage_1_hub_tx_req       )
     );
 
-    logic                                                conv_req_valid     ;
-    logic                                                conv_req_ready     ;
-    logic    [AXIS_DATA_WIDTH-1:0]                       conv_req_data      ;
-    logic    [AXIS_KEEP_WIDTH-1:0]                       conv_req_keep      ;
-    logic    [TBU_NUM_WIDTH-1  :0]                       conv_req_tid       ;
-    logic                                                conv_req_last      ;                                                     
-    logic                                                conv_rsp_valid     ;
-    logic                                                conv_rsp_ready     ;
-    logic    [CUSTOM_DATA_WIDTH-1:0]                     conv_rsp_data      ;
-    logic    [CUSTOM_KEEP_WIDTH-1:0]                     conv_rsp_keep      ;
-    logic    [TBU_NUM_WIDTH-1    :0]                     conv_rsp_tid       ;
-    logic                                                conv_rsp_last      ;
-    // DTI_to_async    
-    logic                                                req_valid          ;
-    logic                                                req_ready          ;
-    logic    [CUSTOM_DATA_WIDTH+CUSTOM_KEEP_WIDTH-1:0]   req_payload        ;
-    logic    [TBU_NUM_WIDTH-1  :0]                       req_srcid          ;
-    logic    [TBU_NUM_WIDTH-1  :0]                       req_tgtid          ;
-    logic                                                req_qos            ; //tie1
-    logic                                                req_threshold      ;
-    logic                                                req_last           ;
-    // async_to_DTI                                                            
-    logic                                                rsp_valid          ;
-    logic                                                rsp_ready          ;
-    logic    [CUSTOM_DATA_WIDTH+CUSTOM_KEEP_WIDTH-1:0]   rsp_payload        ;
-    logic    [TBU_NUM_WIDTH-1    :0]                     rsp_srcid          ;
-    logic    [TBU_NUM_WIDTH-1    :0]                     rsp_tgtid          ;
-    logic                                                rsp_qos            ; //tie 1
-    logic                                                rsp_threshold      ;
-    logic                                                rsp_last           ;
-    // async fifo req
-    logic                                                async_req_stall    ;
-    logic                                                async_req_clear    ;
-    logic                                                async_req_full_zero;
-    logic   [90+6+6+1+1-1:0]                             req_pld_vector     ;
-    // async fifo rsp    
-    logic                                                rsp_async_stall    ;
-    logic                                                rsp_async_clear    ;
-    logic                                                rsp_async_full_zero;
-    logic                                                rsp_async_idle     ;
-    logic   [90+6+6+1+1-1:0]                             rsp_pld_vector     ;
+    lwnoc_lp_tniu_func_iniu #(
+        .TIME_OUT_WIDTH     (TIME_OUT_WIDTH             )
+    ) u_intr_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (niu_lp_hub_tx_req          ),
+        .tx_req             (niu_lp_hub_rx_req          ),
+        .stall              (niu_stall                  ),
+        .partial_reset      (niu_partical_rst           ),
+        .trans_idle         (niu_idle                   ),
+        .timeout_val        (timeout_val                )
+    );
+
+    lwnoc_lp_nest u_lwnoc_lp_nest(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req_main        (barrier_lp_hub_tx_req      ),
+        .tx_req_main        (barrier_lp_hub_rx_req      ),
+        .rx_req_sub         (barrier_lp_sub_hub_tx_req  ),
+        .tx_req_sub         (barrier_lp_sub_hub_rx_req  )
+    );
+
+    lwnoc_lp_hub_wrapper #(
+        .NUM_TERMINAL       (4                          )
+    ) u_stage_2_hub (
+        .v_rx_req           (v_stage_2_hub_rx_req       ),
+        .v_tx_req           (v_stage_2_hub_tx_req       )
+    );
+
+    lwnoc_lp_tniu_async_bridge u_slv_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_slave_hub_tx_req     ),
+        .tx_req             (async_slave_hub_rx_req     ),
+        .stall_ptr          (async_req_stall            ),
+        .clear_ptr          (async_req_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (async_req_full_zero        )
+    );
+
+    lwnoc_lp_tniu_async_bridge u_mst_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_master_hub_tx_req    ),
+        .tx_req             (async_master_hub_rx_req    ),
+        .stall_ptr          (rsp_async_stall            ),
+        .clear_ptr          (rsp_async_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (rsp_async_full_zero        )
+    );
     //===========================================================================
     // package
     //===========================================================================
@@ -89,8 +210,9 @@ module dti_pr_iniu_async_sys_side
     dti_pr u_dti_pr (
     .clk             (clk             ),
     .rst_n           (rst_n           ),
-    .partial_reset   (partial_reset   ),
-    .idle            (idle            ),
+    .stall           (niu_stall       ),
+    .partial_reset   (niu_partical_rst),
+    .idle            (niu_idle        ),
     .req_tvalid      (req_tvalid      ),
     .req_tdata       (req_tdata       ),
     .req_tkeep       (req_tkeep       ),

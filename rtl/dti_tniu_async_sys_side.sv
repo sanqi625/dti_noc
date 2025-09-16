@@ -1,4 +1,6 @@
 module dti_tniu_async_sys_side
+    import lwnoc_lp_define_package::*;
+    import lwnoc_lp_struct_package::*;
     import dti_pack::*;
 #(
     parameter integer unsigned ASYNC_FIFO_DEPTH = 10    
@@ -28,7 +30,15 @@ module dti_tniu_async_sys_side
     output logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_wptr_async                             ,
     input  logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_async                             ,
     input  logic    [ASYNC_FIFO_DEPTH-1 :0]             rsp_rptr_sync                              ,
-    output logic    [90+6+6+1+1         :0]             rsp_pld_sync
+    output logic    [90+6+6+1+1         :0]             rsp_pld_sync                               ,
+    // lp
+    input  logic                                        preq                                       ,
+    input  lwnoc_pchannel_state_t                       pstate                                     ,
+    output lwnoc_pchannel_active_t                      pactive                                    ,
+    output logic                                        paccept                                    ,
+    output logic                                        pdeny                                      ,
+    input  lwnoc_lp_req_signal_t                        lp_hub_rx_req                              ,
+    output lwnoc_lp_req_signal_t                        lp_hub_tx_req 
 );
 
     logic                                            req_valid          ;
@@ -56,8 +66,66 @@ module dti_tniu_async_sys_side
     logic                                            req_async_stall    ;
     logic                                            req_async_idle     ;
     logic                                            req_async_full_zero;
+    lwnoc_lp_req_signal_t                            v_stage_1_hub_rx_req[3:0];
+    lwnoc_lp_req_signal_t                            v_stage_1_hub_tx_req[3:0];
+    lwnoc_lp_req_signal_t                            lp_iniu_rx_req     ;
+    lwnoc_lp_req_signal_t                            lp_iniu_tx_req     ;
+    lwnoc_lp_req_signal_t                            async_master_hub_tx_req;
+    lwnoc_lp_req_signal_t                            async_master_hub_rx_req;
+    lwnoc_lp_req_signal_t                            async_slave_hub_tx_req ;
+    lwnoc_lp_req_signal_t                            async_slave_hub_rx_req ;
+    //=================================================
+    // LP
+    //================================================= 
+    assign v_stage_1_hub_rx_req[0] = lp_iniu_rx_req;
+    assign v_stage_1_hub_rx_req[1] = async_slave_hub_rx_req;
+    assign v_stage_1_hub_rx_req[2] = async_master_hub_rx_req;
+    assign v_stage_1_hub_rx_req[3] = lp_hub_rx_req;
+    assign lp_hub_tx_req           = v_stage_1_hub_tx_req[0];
+    assign async_slave_hub_tx_req  = v_stage_1_hub_tx_req[1];
+    assign async_master_hub_tx_req = v_stage_1_hub_tx_req[2];
+    assign lp_iniu_tx_req          = v_stage_1_hub_tx_req[3];
 
+    lwnoc_lp_iniu u_lwnoc_lp_iniu(
+        .clk          (clk                ),
+        .rst_n        (rst_n              ),
+        .rx_req       (lp_iniu_tx_req     ),
+        .tx_req       (lp_iniu_rx_req     ),
+        .preq         (preq               ),
+        .pstate       (pstate             ),
+        .pactive      (pactive            ),
+        .paccept      (paccept            ),
+        .pdeny        (pdeny              )
+    ); 
 
+    lwnoc_lp_hub_wrapper #(
+        .NUM_TERMINAL       (4                          )
+    ) u_stage_1_hub (
+        .v_rx_req           (v_stage_1_hub_rx_req       ),
+        .v_tx_req           (v_stage_1_hub_tx_req       )
+    );
+
+    lwnoc_lp_tniu_async_bridge u_slv_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_slave_hub_tx_req     ),
+        .tx_req             (async_slave_hub_rx_req     ),
+        .stall_ptr          (req_async_stall            ),
+        .clear_ptr          (req_async_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (req_async_full_zero        )
+    );
+
+    lwnoc_lp_tniu_async_bridge u_mst_lp_tniu(
+        .clk                (clk                        ),
+        .rst_n              (rst_n                      ),
+        .rx_req             (async_master_hub_tx_req    ),
+        .tx_req             (async_master_hub_rx_req    ),
+        .stall_ptr          (rsp_async_stall            ),
+        .clear_ptr          (rsp_async_clear            ),
+        .trans_idle         (1'b1                       ),
+        .full_zero          (async_rsp_full_zero        )
+    );
     //=================================================
     // CONV
     //================================================= 
@@ -100,7 +168,6 @@ module dti_tniu_async_sys_side
     assign req_srcid     = req_pld_vector[13:8];
     assign req_payload   = req_pld_vector[103:14];
 
-
     afifo_mst #(
         .DATA_WIDTH         (90+6+6+1+1             ),
         .FIFO_DEPTH         (ASYNC_FIFO_DEPTH       ))
@@ -111,13 +178,10 @@ module dti_tniu_async_sys_side
         .clear              (req_async_clear        ),
         .full_zero          (req_async_full_zero    ),
         .idle               (req_async_idle         ),
-
         .m_vld              (req_valid              ),
         .m_pld              (req_pld_vector         ),
         .m_rdy              (req_ready              ),
-
         .wptr_async         (req_wptr_async         ),
-
         .rptr_async         (req_rptr_async         ),
         .rptr_sync          (req_rptr_sync          ),
         .pld_sync           (req_pld_sync           )
@@ -137,13 +201,10 @@ module dti_tniu_async_sys_side
         .stall              (async_rsp_stall        ),
         .clear              (async_rsp_clear        ),
         .full_zero          (async_rsp_full_zero    ),
-
         .s_vld              (rsp_valid              ),
         .s_pld              (rsp_pld_vector         ),
         .s_rdy              (rsp_ready              ),
-
         .wptr_async         (rsp_wptr_async         ),
-        
         .rptr_async         (rsp_rptr_async         ),
         .rptr_sync          (rsp_rptr_sync          ),
         .pld_sync           (rsp_pld_sync           )

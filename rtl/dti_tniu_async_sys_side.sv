@@ -1,7 +1,7 @@
-module dti_tniu_async_sys_side
+module `_PREFIX_(dti_tniu_async_sys_side)
     import lwnoc_lp_define_package::*;
     import lwnoc_lp_struct_package::*;
-    import dti_pack::*;
+    import `_PREFIX_(dti_tniu_pack)::*;
 #(
     parameter integer unsigned ASYNC_FIFO_DEPTH = 10    
 )(
@@ -129,7 +129,7 @@ module dti_tniu_async_sys_side
     //=================================================
     // CONV
     //================================================= 
-    gnpd_to_dti_conv u_gnpd_to_dti_conv (
+    `_PREFIX_(gnpd_to_dti_conv) u_gnpd_to_dti_conv (
     .req_valid             (req_valid     ),
     .req_ready             (req_ready     ),
     .req_payload           (req_payload   ),

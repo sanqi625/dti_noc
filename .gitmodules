@@ -4,3 +4,6 @@
 [submodule "lwnoc_lowpower_component"]
 	path = lwnoc_lowpower_component
 	url = git@github.com:fliibs/lwnoc_lowpower_component.git
+[submodule "fexpand"]
+	path = fexpand
+	url = git@github.com:YuunqiLiu/fexpand.git

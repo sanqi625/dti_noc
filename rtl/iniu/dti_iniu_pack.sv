@@ -1,4 +1,4 @@
-package dti_pack;
+package `_PREFIX_(dti_iniu_pack);
 
     localparam integer unsigned TBU_NUM_WIDTH             = 6;
     localparam integer unsigned AXIS_MAX_DATA_WIDTH       = 160;

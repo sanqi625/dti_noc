@@ -1,7 +1,7 @@
-module dti_pr_iniu_async_sys_side
+module `_PREFIX_(dti_pr_iniu_async_sys_side)
     import lwnoc_lp_define_package::*;
     import lwnoc_lp_struct_package::*;
-    import dti_pack::*;
+    import `_PREFIX_(dti_iniu_pack)::*;
     #(
         parameter integer unsigned  ASYNC_FIFO_DEPTH    = 16,
         parameter integer unsigned  TIME_OUT_WIDTH      = 10
@@ -207,7 +207,7 @@ module dti_pr_iniu_async_sys_side
     //=================================================
     // DTI_PR
     //================================================= 
-    dti_pr u_dti_pr (
+    `_PREFIX_(dti_pr) u_dti_pr (
     .clk             (clk             ),
     .rst_n           (rst_n           ),
     .stall           (niu_stall       ),
@@ -241,7 +241,7 @@ module dti_pr_iniu_async_sys_side
     //=================================================
     // CONV
     //================================================= 
-    dti_to_gnpd_conv u_dti_to_gnpd_conv (
+    `_PREFIX_(dti_to_gnpd_conv) u_dti_to_gnpd_conv (
     .req_tvalid      (conv_req_valid  ),
     .req_tdata       (conv_req_data   ),
     .req_tkeep       (conv_req_keep   ),
@@ -284,13 +284,10 @@ module dti_pr_iniu_async_sys_side
         .stall              (async_req_stall        ),
         .clear              (async_req_clear        ),
         .full_zero          (async_req_full_zero    ),
-
         .s_vld              (req_valid              ),
         .s_pld              (req_pld_vector         ),
         .s_rdy              (req_ready              ),
-
         .wptr_async         (req_wptr_async         ),
-        
         .rptr_async         (req_rptr_async         ),
         .rptr_sync          (req_rptr_sync          ),
         .pld_sync           (req_pld_sync           )
@@ -308,13 +305,10 @@ module dti_pr_iniu_async_sys_side
         .clear              (rsp_async_clear        ),
         .full_zero          (rsp_async_full_zero    ),
         .idle               (rsp_async_idle         ),
-
         .m_vld              (rsp_valid              ),
         .m_pld              (rsp_pld_vector         ),
         .m_rdy              (rsp_ready              ),
-
         .wptr_async         (rsp_wptr_async         ),
-        
         .rptr_async         (rsp_rptr_async         ),
         .rptr_sync          (rsp_rptr_sync          ),
         .pld_sync           (rsp_pld_sync           )

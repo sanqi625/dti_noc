@@ -1,7 +1,7 @@
-module dti_tniu_async_top_side
+module `_PREFIX_(dti_tniu_async_top_side)
     import lwnoc_lp_define_package::*;
     import lwnoc_lp_struct_package::*;
-    import dti_pack::*;
+    import `_PREFIX_(dti_tniu_pack)::*;
 #(
     parameter integer unsigned ASYNC_FIFO_DEPTH = 10    
 )(

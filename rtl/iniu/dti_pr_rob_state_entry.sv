@@ -1,5 +1,5 @@
-module dti_pr_rob_state_entry 
-    import dti_pack::*;
+module `_PREFIX_(dti_pr_rob_state_entry) 
+    import `_PREFIX_(dti_iniu_pack)::*;
     (
     input   logic                                       clk                                         ,
     input   logic                                       rst_n                                       ,

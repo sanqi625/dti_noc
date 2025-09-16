@@ -1,5 +1,5 @@
-module dti_to_gnpd_conv 
-    import dti_pack::*;
+module `_PREFIX_(dti_to_gnpd_conv) 
+    import `_PREFIX_(dti_iniu_pack)::*;
     (
     // REQ_data channel
     input   logic                                       req_tvalid                                  ,

@@ -1,5 +1,5 @@
-module dti_pr 
-    import dti_pack::*;
+module `_PREFIX_(dti_pr) 
+    import `_PREFIX_(dti_iniu_pack)::*;
     (
     input   logic                                       clk                                         ,
     input   logic                                       rst_n                                       , 
@@ -105,7 +105,7 @@ module dti_pr
     //================================================= 
     generate 
         for (genvar i=0; i<TBU_NUM; i++) begin: rob_entry
-            dti_pr_rob_state_entry u_dti_pr_rob_state_entry (   
+            `_PREFIX_(dti_pr_rob_state_entry) u_dti_pr_rob_state_entry (   
                 .clk                 (clk                    ),
                 .rst_n               (rst_n                  ),
                 .entry_reset         (entry_reset[i]         ),

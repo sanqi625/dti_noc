@@ -17,10 +17,10 @@ module `_PREFIX_(dti_tniu_async_top_side)
     output  logic                                            req_threshold                              ,
     output  logic                                            req_ready                                  , //async rdy
     // async fifo req
-    output logic    [ASYNC_FIFO_DEPTH-1                  :0] req_wptr_async                             ,
-    input  logic    [ASYNC_FIFO_DEPTH-1                  :0] req_rptr_async                             ,
-    input  logic    [ASYNC_FIFO_DEPTH-1                  :0] req_rptr_sync                              ,
-    output logic    [90+6+6+1+1                          :0] req_pld_sync                               ,
+    output logic   [ASYNC_FIFO_DEPTH-1                  :0]  req_wptr_async                             ,
+    input  logic   [ASYNC_FIFO_DEPTH-1                  :0]  req_rptr_async                             ,
+    input  logic   [ASYNC_FIFO_DEPTH-1                  :0]  req_rptr_sync                              ,
+    output logic   [90+6+6+1+1                          :0]  req_pld_sync                               ,
     // RSP_data channel
     output  logic                                            rsp_valid                                  ,
     output  logic  [CUSTOM_DATA_WIDTH+CUSTOM_KEEP_WIDTH-1:0] rsp_payload                                ,

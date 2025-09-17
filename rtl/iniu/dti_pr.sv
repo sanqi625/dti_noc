@@ -1,6 +1,9 @@
 module `_PREFIX_(dti_pr) 
     import `_PREFIX_(dti_iniu_pack)::*;
-    (
+#(
+    parameter integer unsigned TBU_NUM             = 4,
+    parameter integer unsigned TRANSACTION_MAX_NUM = 8
+)(
     input   logic                                       clk                                         ,
     input   logic                                       rst_n                                       , 
     // REQ_data channel
@@ -67,6 +70,8 @@ module `_PREFIX_(dti_pr)
     logic [CUSTOM_KEEP_WIDTH-1:0]        reset_keep          ;   
     logic                                reset_last          ;
     logic [TBU_NUM-1          :0]        entry_req_last      ;
+    logic                                entry_ready         ;
+    logic [TBU_NUM-1          :0]        trans_num_overflow  ;
     
     //=================================================
     // ROB update logic
@@ -75,7 +80,7 @@ module `_PREFIX_(dti_pr)
     assign s_state    = rsp_tdata[4];
     assign m_msg_type = req_tdata[3:0];
     assign m_state    = req_tdata[4];
-    assign tbu_req_en = req_valid && req_ready;
+    assign tbu_req_en = req_valid && req_ready && entry_ready;
     assign tbu_rsp_en = rsp_valid && rsp_ready;
 
     generate 
@@ -104,7 +109,10 @@ module `_PREFIX_(dti_pr)
     //================================================= 
     generate 
         for (genvar i=0; i<TBU_NUM; i++) begin: rob_entry
-            `_PREFIX_(dti_pr_rob_state_entry) u_dti_pr_rob_state_entry (   
+            `_PREFIX_(dti_pr_rob_state_entry) #(               
+                .TBU_NUM             (TBU_NUM             ),
+                .TRANSACTION_MAX_NUM (TRANSACTION_MAX_NUM )) 
+            u_dti_pr_rob_state_entry (
                 .clk                 (clk                    ),
                 .rst_n               (rst_n                  ),
                 .entry_reset         (entry_reset[i]         ),
@@ -118,6 +126,7 @@ module `_PREFIX_(dti_pr)
                 .entry_tid_in        (req_tid                ),
                 .req_ready           (req_ready              ),
                 .idle                (entry_idle[i]          ),
+                .trans_num_overflow  (trans_num_overflow[i]  ),
                 .entry_tid_out       (entry_tid[i]           ),
                 .entry_req_valid     (entry_req_valid[i]     ),
                 .entry_req_data      (entry_req_data[i]      ),
@@ -144,6 +153,15 @@ module `_PREFIX_(dti_pr)
     //=================================================
     // DTI to CUSTOM
     //=================================================
+    always_comb begin: trans_num_overflow_ready
+        entry_ready = 1'b1;
+        for (int i=0; i<TBU_NUM; i++) begin
+            if (entry_tid[i] == req_tid) begin
+                entry_ready = ~trans_num_overflow[i];
+            end
+        end
+    end
+
     always_comb begin: reset_mux_logic
         reset_data    = {CUSTOM_DATA_WIDTH{1'b0}};
         reset_keep    = {CUSTOM_KEEP_WIDTH{1'b0}};
@@ -165,7 +183,7 @@ module `_PREFIX_(dti_pr)
     assign req_keep    = partial_reset ? reset_keep : req_tkeep;  
     assign req_tid     = partial_reset ? reset_id : req_ttid;
     assign req_last    = partial_reset ? reset_last : req_tlast;
-    assign req_tready  = partial_reset ? 1'd0 : (req_ready && ~stall);
+    assign req_tready  = partial_reset ? 1'd0 : (req_ready && ~stall && entry_ready);
     //=================================================
     // CUSTOM to DTI
     //=================================================  

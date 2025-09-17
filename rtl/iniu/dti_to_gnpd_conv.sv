@@ -1,6 +1,9 @@
 module `_PREFIX_(dti_to_gnpd_conv) 
     import `_PREFIX_(dti_iniu_pack)::*;
-    (
+#(
+    parameter integer unsigned TBU_NUM             = 4,
+    parameter integer unsigned TRANSACTION_MAX_NUM = 8
+)(
     // REQ_data channel
     input   logic                                       req_tvalid                                  ,
     input   logic   [79:0]                              req_tdata                                   ,

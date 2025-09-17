@@ -3,6 +3,8 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
     import lwnoc_lp_struct_package::*;
     import `_PREFIX_(dti_iniu_pack)::*;
     #(
+        parameter integer unsigned TBU_NUM              = `TBU_NUM,
+        parameter integer unsigned TRANSACTION_MAX_NUM  = `TRANSACTION_MAX_NUM,
         parameter integer unsigned  ASYNC_FIFO_DEPTH    = 16,
         parameter integer unsigned  TIME_OUT_WIDTH      = 10
     )(
@@ -126,7 +128,7 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
     assign async_slave_hub_tx_req    = v_stage_2_hub_tx_req[1];
     assign async_master_hub_tx_req   = v_stage_2_hub_tx_req[2];
     assign lp_hub_tx_req             = v_stage_2_hub_tx_req[3];
-
+    // lp iniu
     lwnoc_lp_iniu u_lwnoc_lp_iniu(
         .clk          (clk                ),
         .rst_n        (rst_n              ),
@@ -138,14 +140,14 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
         .paccept      (paccept            ),
         .pdeny        (pdeny              )
     ); 
-
+    // lp hub 3t
     lwnoc_lp_hub_wrapper #(
         .NUM_TERMINAL       (3                          )
     ) u_stage_1_hub (
         .v_rx_req           (v_stage_1_hub_rx_req       ),
         .v_tx_req           (v_stage_1_hub_tx_req       )
     );
-
+    // lp tniu func iniu
     lwnoc_lp_tniu_func_iniu #(
         .TIME_OUT_WIDTH     (TIME_OUT_WIDTH             )
     ) u_intr_lp_tniu(
@@ -158,7 +160,7 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
         .trans_idle         (niu_idle                   ),
         .timeout_val        (timeout_val                )
     );
-
+    // lp nest
     lwnoc_lp_nest u_lwnoc_lp_nest(
         .clk                (clk                        ),
         .rst_n              (rst_n                      ),
@@ -167,14 +169,14 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
         .rx_req_sub         (barrier_lp_sub_hub_tx_req  ),
         .tx_req_sub         (barrier_lp_sub_hub_rx_req  )
     );
-
+    // lp hub 4t
     lwnoc_lp_hub_wrapper #(
         .NUM_TERMINAL       (4                          )
     ) u_stage_2_hub (
         .v_rx_req           (v_stage_2_hub_rx_req       ),
         .v_tx_req           (v_stage_2_hub_tx_req       )
     );
-
+    // lp tniu slv
     lwnoc_lp_tniu_async_bridge u_slv_lp_tniu(
         .clk                (clk                        ),
         .rst_n              (rst_n                      ),
@@ -185,7 +187,7 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
         .trans_idle         (1'b1                       ),
         .full_zero          (async_req_full_zero        )
     );
-
+    // lp tniu mst
     lwnoc_lp_tniu_async_bridge u_mst_lp_tniu(
         .clk                (clk                        ),
         .rst_n              (rst_n                      ),
@@ -207,69 +209,75 @@ module `_PREFIX_(dti_pr_iniu_async_sys_side)
     //=================================================
     // DTI_PR
     //================================================= 
-    `_PREFIX_(dti_pr) u_dti_pr (
-    .clk             (clk             ),
-    .rst_n           (rst_n           ),
-    .stall           (niu_stall       ),
-    .partial_reset   (niu_partical_rst),
-    .idle            (niu_idle        ),
-    .req_tvalid      (req_tvalid      ),
-    .req_tdata       (req_tdata       ),
-    .req_tkeep       (req_tkeep       ),
-    .req_tlast       (req_tlast       ),
-    .req_ttid        (req_ttid        ),
-    .req_tready      (req_tready      ), //custom rdy
-    .rsp_tvalid      (rsp_tvalid      ),
-    .rsp_tdata       (rsp_tdata       ),
-    .rsp_tkeep       (rsp_tkeep       ),
-    .rsp_tlast       (rsp_tlast       ),
-    .rsp_ttid        (rsp_ttid        ),
-    .rsp_tready      (rsp_tready      ), //dti rdy
-    .req_valid       (conv_req_valid  ),
-    .req_ready       (conv_req_ready  ),
-    .req_data        (conv_req_data   ),
-    .req_keep        (conv_req_keep   ),
-    .req_tid         (conv_req_tid    ),
-    .req_last        (conv_req_last   ),                 
-    .rsp_valid       (conv_rsp_valid  ),
-    .rsp_ready       (conv_rsp_ready  ),
-    .rsp_data        (conv_rsp_data   ),
-    .rsp_keep        (conv_rsp_keep   ),
-    .rsp_tid         (conv_rsp_tid    ),
-    .rsp_last        (conv_rsp_last   )                    
+    `_PREFIX_(dti_pr) #(
+        .TBU_NUM             (TBU_NUM             ),
+        .TRANSACTION_MAX_NUM (TRANSACTION_MAX_NUM ))
+    u_dti_pr (
+        .clk             (clk             ),
+        .rst_n           (rst_n           ),
+        .stall           (niu_stall       ),
+        .partial_reset   (niu_partical_rst),
+        .idle            (niu_idle        ),
+        .req_tvalid      (req_tvalid      ),
+        .req_tdata       (req_tdata       ),
+        .req_tkeep       (req_tkeep       ),
+        .req_tlast       (req_tlast       ),
+        .req_ttid        (req_ttid        ),
+        .req_tready      (req_tready      ), //custom rdy
+        .rsp_tvalid      (rsp_tvalid      ),
+        .rsp_tdata       (rsp_tdata       ),
+        .rsp_tkeep       (rsp_tkeep       ),
+        .rsp_tlast       (rsp_tlast       ),
+        .rsp_ttid        (rsp_ttid        ),
+        .rsp_tready      (rsp_tready      ), //dti rdy
+        .req_valid       (conv_req_valid  ),
+        .req_ready       (conv_req_ready  ),
+        .req_data        (conv_req_data   ),
+        .req_keep        (conv_req_keep   ),
+        .req_tid         (conv_req_tid    ),
+        .req_last        (conv_req_last   ),                 
+        .rsp_valid       (conv_rsp_valid  ),
+        .rsp_ready       (conv_rsp_ready  ),
+        .rsp_data        (conv_rsp_data   ),
+        .rsp_keep        (conv_rsp_keep   ),
+        .rsp_tid         (conv_rsp_tid    ),
+        .rsp_last        (conv_rsp_last   )                    
     );
     //=================================================
     // CONV
     //================================================= 
-    `_PREFIX_(dti_to_gnpd_conv) u_dti_to_gnpd_conv (
-    .req_tvalid      (conv_req_valid  ),
-    .req_tdata       (conv_req_data   ),
-    .req_tkeep       (conv_req_keep   ),
-    .req_tlast       (conv_req_last   ),
-    .req_ttid        (conv_req_tid    ),
-    .req_tready      (conv_req_ready  ), //custom rdy
-    .rsp_tvalid      (conv_rsp_valid  ),
-    .rsp_tdata       (conv_rsp_data   ),
-    .rsp_tkeep       (conv_rsp_keep   ),
-    .rsp_tlast       (conv_rsp_last   ),
-    .rsp_ttid        (conv_rsp_tid    ),
-    .rsp_tready      (conv_rsp_ready  ), //dti rdy
-    .req_valid       (req_valid       ),
-    .req_ready       (req_ready       ),
-    .req_payload     (req_payload     ),
-    .req_srcid       (req_srcid       ),
-    .req_tgtid       (req_tgtid       ),
-    .req_qos         (req_qos         ), //tie1
-    .req_last        (req_last        ),
-    .req_threshold   (req_threshold   ), //tie1                
-    .rsp_valid       (rsp_valid       ),
-    .rsp_ready       (rsp_ready       ),
-    .rsp_payload     (rsp_payload     ),
-    .rsp_srcid       (rsp_srcid       ),
-    .rsp_tgtid       (rsp_tgtid       ),
-    .rsp_qos         (rsp_qos         ), //tie 1
-    .rsp_last        (rsp_last        ),
-    .rsp_threshold   (rsp_threshold   )  //tie 1
+    `_PREFIX_(dti_to_gnpd_conv) #(
+        .TBU_NUM             (TBU_NUM             ),
+        .TRANSACTION_MAX_NUM (TRANSACTION_MAX_NUM ))
+    u_dti_to_gnpd_conv (
+        .req_tvalid      (conv_req_valid  ),
+        .req_tdata       (conv_req_data   ),
+        .req_tkeep       (conv_req_keep   ),
+        .req_tlast       (conv_req_last   ),
+        .req_ttid        (conv_req_tid    ),
+        .req_tready      (conv_req_ready  ), //custom rdy
+        .rsp_tvalid      (conv_rsp_valid  ),
+        .rsp_tdata       (conv_rsp_data   ),
+        .rsp_tkeep       (conv_rsp_keep   ),
+        .rsp_tlast       (conv_rsp_last   ),
+        .rsp_ttid        (conv_rsp_tid    ),
+        .rsp_tready      (conv_rsp_ready  ), //dti rdy
+        .req_valid       (req_valid       ),
+        .req_ready       (req_ready       ),
+        .req_payload     (req_payload     ),
+        .req_srcid       (req_srcid       ),
+        .req_tgtid       (req_tgtid       ),
+        .req_qos         (req_qos         ), //tie1
+        .req_last        (req_last        ),
+        .req_threshold   (req_threshold   ), //tie1                
+        .rsp_valid       (rsp_valid       ),
+        .rsp_ready       (rsp_ready       ),
+        .rsp_payload     (rsp_payload     ),
+        .rsp_srcid       (rsp_srcid       ),
+        .rsp_tgtid       (rsp_tgtid       ),
+        .rsp_qos         (rsp_qos         ), //tie 1
+        .rsp_last        (rsp_last        ),
+        .rsp_threshold   (rsp_threshold   )  //tie 1
     );
     //===========================================================================
     // async fifo req slv

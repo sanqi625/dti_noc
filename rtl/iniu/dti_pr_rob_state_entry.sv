@@ -1,6 +1,9 @@
 module `_PREFIX_(dti_pr_rob_state_entry) 
     import `_PREFIX_(dti_iniu_pack)::*;
-    (
+#(
+    parameter integer unsigned TBU_NUM             = 4,
+    parameter integer unsigned TRANSACTION_MAX_NUM = 8
+)(
     input   logic                                       clk                                         ,
     input   logic                                       rst_n                                       ,
 
@@ -16,6 +19,7 @@ module `_PREFIX_(dti_pr_rob_state_entry)
     input   logic                                       req_ready                                   ,
 
     output  logic                                       idle                                        ,
+    output  logic                                       trans_num_overflow                          ,
     output  logic  [TBU_NUM_WIDTH-1    :0]              entry_tid_out                               ,
     output  logic                                       entry_req_valid                             ,
     output  logic  [CUSTOM_DATA_WIDTH-1:0]              entry_req_data                              ,
@@ -45,6 +49,7 @@ module `_PREFIX_(dti_pr_rob_state_entry)
         else if(entry_trans_req)                          trans_num <= trans_num + 1'd1;
         else if(entry_trans_ack)                          trans_num <= trans_num - 1'd1;
     end
+    assign trans_num_overflow = (trans_num=={$clog2(TRANSACTION_MAX_NUM){1'b1}});
     //=================================================
     // TRAN FINISH FLAG
     //=================================================

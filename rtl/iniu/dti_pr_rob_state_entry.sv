@@ -9,7 +9,7 @@ module `_PREFIX_(dti_pr_rob_state_entry)
 
     input   logic                                       entry_reset                                 ,
     input   logic                                       entry_con_req                               ,
-    input   logic                                       entry_trans_ack                             ,
+    input   logic                                       entry_trans_ack_last                        ,
     input   logic                                       entry_trans_req                             ,
     input   logic                                       entry_ack_con                               ,
     input   logic                                       entry_disconnect_req                        ,
@@ -39,15 +39,17 @@ module `_PREFIX_(dti_pr_rob_state_entry)
     logic                                     disconnect_req;
     logic                                     disconnect_req_mask;
     logic                                     partial_reset_done;
+    logic                                     entry_trans_req_last;
 
     //=================================================
     // TRAN NUM
     //=================================================
+    assign entry_trans_req_last = entry_trans_req && req_last;
     always_ff @(posedge clk or negedge rst_n) begin: trans_num_update
-        if(!rst_n)                                        trans_num <= 'd0;
-        else if(entry_trans_req && entry_trans_ack)       trans_num <= trans_num;
-        else if(entry_trans_req)                          trans_num <= trans_num + 1'd1;
-        else if(entry_trans_ack)                          trans_num <= trans_num - 1'd1;
+        if(!rst_n)                                             trans_num <= 'd0;
+        else if(entry_trans_req_last && entry_trans_ack_last)  trans_num <= trans_num;
+        else if(entry_trans_req_last)                          trans_num <= trans_num + 1'd1;
+        else if(entry_trans_ack_last)                          trans_num <= trans_num - 1'd1;
     end
     assign trans_num_overflow = (trans_num=={$clog2(TRANSACTION_MAX_NUM){1'b1}});
     //=================================================
